@@ -28,7 +28,32 @@ if [ -z "$changed_files" ]; then
   exit 0
 fi
 
-not_ignored="$(echo "$changed_files" | git check-attr --stdin export-ignore | grep -v ': export-ignore: set$' || true)"
+# A directory-only export-ignore pattern (e.g. "docs/", "/docs" or "docs") never matches a nested file's
+# own path via `git check-attr` — only `git archive`'s tree walk applies it to the directory entry
+# itself and prunes the whole subtree. To get the same result, every ancestor directory (queried
+# with a trailing slash) must be checked too, not just the changed file's own path.
+is_export_ignored() {
+  local path="$1" dir
+  if git check-attr export-ignore -- "$path" | grep -q ': export-ignore: set$'; then
+    return 0
+  fi
+  dir="$(dirname "$path")"
+  while [ "$dir" != "." ]; do
+    if git check-attr export-ignore -- "${dir}/" | grep -q ': export-ignore: set$'; then
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+not_ignored=""
+while IFS= read -r file; do
+  if ! is_export_ignored "$file"; then
+    not_ignored="${not_ignored}${file}"$'\n'
+  fi
+done <<<"$changed_files"
+not_ignored="${not_ignored%$'\n'}"
 
 if [ -z "$not_ignored" ]; then
   echo "files_changed=false" >>"$GITHUB_OUTPUT"
@@ -46,5 +71,5 @@ echo "files_changed=true" >>"$GITHUB_OUTPUT"
   echo
   echo "The following files changed outside export-ignore paths:"
   echo
-  echo "$not_ignored" | sed -E 's/^(.*): export-ignore: .*$/- \1/'
+  echo "$not_ignored" | sed 's/^/- /'
 } >>"$GITHUB_STEP_SUMMARY"
