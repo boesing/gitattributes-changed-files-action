@@ -45,6 +45,36 @@ action — the action itself does not perform a checkout.
 |-----------------|--------------------------------------------------------------------------|
 | `files_changed` | `"true"` if any changed file is not export-ignored, otherwise `"false"`. |
 
+## `.gitattributes` pattern notes
+
+A directory-only pattern without a glob, e.g. `docs export-ignore` or `docs/ export-ignore`,
+excludes everything under `docs/` — this action replicates `git archive`'s tree-pruning behavior
+for such patterns. If you also want to un-ignore a specific file inside that directory with a
+negation rule (`-export-ignore`), it will have **no effect**: once a directory itself matches
+`export-ignore`, `git archive` (and this action) never looks at more specific rules inside it.
+
+```gitattributes
+docs export-ignore
+docs/keep-me.txt -export-ignore   # ignored: docs/ already excludes everything below it
+```
+
+To make a per-file exception work, write the broad rule as a recursive glob (`docs/**`) instead,
+which matches each file individually rather than pruning the whole directory:
+
+```gitattributes
+docs/** export-ignore
+docs/keep-me.txt -export-ignore       # works: docs/** matches files individually
+```
+
+This only works one level deep, though. `docs/**` also matches subdirectories under `docs/` as
+tree entries in their own right, so a negation for a file further down still gets pruned before
+it's ever evaluated:
+
+```gitattributes
+docs/** export-ignore
+docs/sub/keep-me.txt -export-ignore   # ignored: docs/sub itself already matches docs/**
+```
+
 ## Job summary
 
 The action writes a human-readable summary of the changed files to the job's

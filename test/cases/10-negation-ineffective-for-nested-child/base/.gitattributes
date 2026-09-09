@@ -1,0 +1,2 @@
+docs/** export-ignore
+docs/sub/keep-me.txt -export-ignore
