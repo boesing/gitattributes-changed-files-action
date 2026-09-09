@@ -1,0 +1,36 @@
+name: 'Check Export-Ignore Changes'
+description: >
+  Determines whether the changes between two commits touch any path that is not marked
+  export-ignore in .gitattributes.
+author: 'boesing'
+branding:
+  icon: 'git-branch'
+  color: 'blue'
+
+inputs:
+  base-sha:
+    description: >
+      The base commit SHA to diff from. If omitted, defaults to github.event.before (falls back
+      to the parent of head-sha if github.event.before is the zero SHA or not resolvable, e.g. on
+      the first push to a branch or after a force-push).
+    required: false
+  head-sha:
+    description: 'The head commit SHA to diff to. If omitted, defaults to github.sha.'
+    required: false
+
+outputs:
+  files_changed:
+    description: '"true" if any changed file is not export-ignored, otherwise "false".'
+    value: ${{ steps.check.outputs.files_changed }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: check
+      shell: bash
+      run: ${{ github.action_path }}/scripts/check-export-ignore.sh
+      env:
+        INPUT_BASE_SHA: ${{ inputs.base-sha }}
+        INPUT_HEAD_SHA: ${{ inputs.head-sha }}
+        EVENT_BEFORE: ${{ github.event.before }}
+        EVENT_AFTER: ${{ github.sha }}
